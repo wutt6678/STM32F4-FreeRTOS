@@ -1,5 +1,6 @@
 #include "stm32f4xx.h"
 #include "FreeRTOS.h"
+#include "LIS3DSH.h"
 #include "task.h"
 #include "math.h"
 #include "stdio.h"
@@ -8,26 +9,36 @@
 // Macro to use CCM (Core Coupled Memory) in STM32F4
 #define CCM_RAM __attribute__((section(".ccmram")))
 
-#define FPU_TASK_STACK_SIZE 256
+#define TEST_TASK_STACK_SIZE 256
 
-StackType_t fpuTaskStack[FPU_TASK_STACK_SIZE] CCM_RAM;  // Put task stack in CCM
-StaticTask_t fpuTaskBuffer CCM_RAM;  // Put TCB in CCM
+StackType_t testTaskStack[TEST_TASK_STACK_SIZE] CCM_RAM;  // Put task stack in CCM
+StaticTask_t testTaskBuffer CCM_RAM;  // Put TCB in CCM
 
 void init_USART3(void);
 
-void test_FPU_test(void* p);
+void test_test(void* p);
 
 int main(void) {
   SystemInit();
   NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
   init_USART3();
 
+  GPIO_InitTypeDef GPIO_InitStruct;
+  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE); 
+
+  GPIO_InitStruct.GPIO_Pin = GPIO_Pin_12;
+  GPIO_InitStruct.GPIO_Mode = GPIO_Mode_OUT;
+  GPIO_InitStruct.GPIO_Speed = GPIO_High_Speed;
+  GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
+  GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_Init(GPIOD, &GPIO_InitStruct);
+
   // Create a task
   // Stack and TCB are placed in CCM of STM32F4
   // The CCM block is connected directly to the core, which leads to zero wait states
-  xTaskCreateStatic(test_FPU_test, "FPU", FPU_TASK_STACK_SIZE, NULL, 1, fpuTaskStack, &fpuTaskBuffer);
+  xTaskCreateStatic(test_test, "test", TEST_TASK_STACK_SIZE, NULL, 1, testTaskStack, &testTaskBuffer);
 
-  printf("System Started!\n");
+  printf("\rSystem Started!\n\r");
   vTaskStartScheduler();  // should never return
 
   for (;;);
@@ -105,17 +116,13 @@ void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackT
   *pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
 }
 
-void test_FPU_test(void* p) {
-  float ff = 1.0f;
-  printf("Start FPU test task.\n");
+void test_test(void* p) {
+  printf("Start test task.\n\r");
   for (;;) {
-    float s = sinf(ff);
-    ff += s;
-    // TODO some other test
-
+    printf("Test task running.\n\r");
+    GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
     vTaskDelay(1000);
   }
-
   vTaskDelete(NULL);
 }
 
